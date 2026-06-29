@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # 1. The Local Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: ecommerce
+    ports:
+      - "5432:5432"
+
+  # 2. The Local Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 3. Your Main API Server
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.docker
+    depends_on:
+      - postgres
+      - redis
+
+  # 4. Your Background Worker
+  worker:
+    build: .
+    # Notice we override the start command! Instead of index.js, it runs worker.js!
+    command: ["node", "src/worker.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - postgres
+      - redis

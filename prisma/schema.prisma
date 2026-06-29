@@ -1,0 +1,106 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id      Int      @id @default(autoincrement())
+  email   String   @unique
+  name    String?
+  
+  orders  Order[]  
+  role     String   @default("USER") // <--- ADD THIS LINE!
+  
+  password String   // <--- ADD THIS LINE!
+  
+  
+  // NEW: A User has exactly ONE Cart. 
+  // It is optional (?) because a new user might not have clicked "add to cart" yet.
+  cart    Cart?    
+}
+
+model Product {
+  id          Int         @id @default(autoincrement())
+  name        String
+  price       Float       
+  inventory   Int         
+  version     Int         @default(1) 
+  
+  orderItems  OrderItem[]
+  // NEW: A product can be inside many people's carts
+  cartItems   CartItem[]  
+}
+
+// ---------------------------------------------------------
+// NEW: CART MODELS
+// ---------------------------------------------------------
+model Cart {
+  id      Int        @id @default(autoincrement())
+  
+  // One-to-One connection back to User
+  userId  Int        @unique
+  user    User       @relation(fields: [userId], references: [id])
+  
+  items   CartItem[]
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  quantity  Int
+
+  // Notice: NO price snapshot here! Carts always pull live Product prices.
+
+  cartId    Int
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+// ---------------------------------------------------------
+// ORDER & PAYMENT MODELS
+// ---------------------------------------------------------
+model Order {
+  id          Int         @id @default(autoincrement())
+  totalAmount Float
+  status      String      @default("PENDING") 
+  createdAt   DateTime    @default(now())
+  
+  userId      Int
+  user        User        @relation(fields: [userId], references: [id])
+  
+  items       OrderItem[]
+  
+  // NEW: An order is linked to exactly ONE Payment
+  payment     Payment?
+  stripeUrl   String?
+}
+
+model OrderItem {
+  id              Int      @id @default(autoincrement())
+  quantity        Int
+  priceAtPurchase Float    // The Snapshot!
+  
+  orderId         Int
+  order           Order    @relation(fields: [orderId], references: [id])
+  
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id                    Int      @id @default(autoincrement())
+  stripePaymentIntentId String   @unique
+  amount                Float
+  status                String   @default("PENDING") // PENDING, SUCCEEDED, FAILED
+  
+  // One-to-One connection back to Order
+  orderId               Int      @unique
+  order                 Order    @relation(fields: [orderId], references: [id])
+}
